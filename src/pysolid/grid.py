@@ -11,11 +11,10 @@
 #   pysolid.calc_solid_earth_tides_grid()
 
 
-import datetime as dt
 import os
 
 import numpy as np
-from skimage.transform import resize
+from scipy import ndimage
 
 
 ##################################  Earth tides - grid mode  ###################################
@@ -73,44 +72,23 @@ def calc_solid_earth_tides_grid(dt_obj, atr, step_size=1e3, display=False, verbo
     vprint('SOLID  : shape: {s}, step size: {la:.4f} by {lo:.4f} deg'.format(
         s=(length, width), la=lat_step, lo=lon_step))
 
-    ## calc solid Earth tides and write to text file
-    txt_file = os.path.abspath('solid.txt')
-    if os.path.isfile(txt_file):
-        os.remove(txt_file)
-
-    vprint('SOLID  : calculating / writing data to txt file: {}'.format(txt_file))
-
-    # Run twice to circumvent fortran bug which cuts off last file in loop - Simran, Jun 2020
-    for _ in range(2):
-        solid_grid(dt_obj.year, dt_obj.month, dt_obj.day,
-                   dt_obj.hour, dt_obj.minute, dt_obj.second,
-                   lat0, lat_step, length-1,
-                   lon0, lon_step, width-1)
-
-    ## read data from text file
-    vprint('PYSOLID: read data from text file: {}'.format(txt_file))
-    grid_size = int(length * width)
-    fc = np.loadtxt(txt_file,
-                    dtype=float,
-                    usecols=(2,3,4),
-                    delimiter=',',
-                    skiprows=0,
-                    max_rows=grid_size+100)[:grid_size]
-    tide_e = fc[:, 0].reshape(length, width)
-    tide_n = fc[:, 1].reshape(length, width)
-    tide_u = fc[:, 2].reshape(length, width)
-
-    # remove the temporary text file
-    os.remove(txt_file)
+    ## calc solid Earth tides
+    tide_e, tide_n, tide_u = solid_grid(dt_obj.year, dt_obj.month, dt_obj.day,
+                                        dt_obj.hour, dt_obj.minute, dt_obj.second,
+                                        lat0, lat_step, length,
+                                        lon0, lon_step, width)
 
     # resample to the input size
+    # via scipy.ndimage.zoom or skimage.transform.resize
     if num_step > 1:
+        in_shape = tide_e.shape
         out_shape = (int(atr['LENGTH']), int(atr['WIDTH']))
         vprint('PYSOLID: resize data to the shape of {} using order-1 spline interpolation'.format(out_shape))
-        kwargs = dict(order=1, mode='edge', anti_aliasing=True, preserve_range=True)
-        tide_e = resize(tide_e, out_shape, **kwargs)
-        tide_n = resize(tide_n, out_shape, **kwargs)
-        tide_u = resize(tide_u, out_shape, **kwargs)
+
+        enu = np.stack([tide_e, tide_n, tide_u])
+        zoom_factors = [1, *np.divide(out_shape, in_shape)]
+        kwargs = dict(order=1, mode="nearest", grid_mode=True)
+        tide_e, tide_n, tide_u = ndimage.zoom(enu, zoom_factors, **kwargs)
 
     # plot
     if display:

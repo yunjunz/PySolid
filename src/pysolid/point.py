@@ -16,8 +16,6 @@ import datetime as dt
 import os
 
 import numpy as np
-from matplotlib import pyplot as plt, ticker, dates as mdates
-from scipy import signal
 
 
 ## Tidal constituents
@@ -64,7 +62,7 @@ TIDES = (
     Tag('Shallow water terdiurnal'                  , r'$MK_3$'     , 8.177140247,  44.0251729, 365.555, 8 ),
     Tag('Shallow water overtides of principal solar', r'$S_4$'      , 6.0        ,  60.0      , 491.555, 9 ),
     Tag('Shallow water quarter diurnal'             , r'$MN_4$'     , 6.269173724,  57.4238337, 445.655, 10),
-    Tag('Shallow water overtides of principal solar', r'$S_6$'      , 4.0        ,  90.0      , np.NaN , 12),
+    Tag('Shallow water overtides of principal solar', r'$S_6$'      , 4.0        ,  90.0      , np.nan , 12),
     Tag('Lunar terdiurnal'                          , r'$M_3$'      , 8.280400802,  43.4761563, 355.555, 32),
     Tag('Shallow water terdiurnal'                  , '2"MK'+r'$_3$', 8.38630265 ,  42.9271398, 345.555, 34),
     Tag('Shallow water eighth diurnal'              , r'$M_8$'      , 3.105150301, 115.9364166, 855.555, 36),
@@ -94,10 +92,10 @@ def calc_solid_earth_tides_point(lat, lon, dt0, dt1, step_sec=60, display=False,
     """
 
     print('PYSOLID: calculate solid Earth tides in east/north/up direction')
-    print('PYSOLID: lot/lon: {}/{} degree'.format(lat, lon))
-    print('PYSOLID: start UTC: {}'.format(dt0.isoformat()))
-    print('PYSOLID: end   UTC: {}'.format(dt1.isoformat()))
-    print('PYSOLID: time step: {} seconds'.format(step_sec))
+    print(f'PYSOLID: lot/lon: {lat}/{lon} degree')
+    print(f'PYSOLID: start UTC: {dt0.isoformat()}')
+    print(f'PYSOLID: end   UTC: {dt1.isoformat()}')
+    print(f'PYSOLID: time step: {step_sec} seconds')
 
     dt_out = []
     tide_e = []
@@ -108,7 +106,7 @@ def calc_solid_earth_tides_point(lat, lon, dt0, dt1, step_sec=60, display=False,
     for i in range(ndays):
         di = dt0.date() + dt.timedelta(days=i)
         if verbose:
-            print('SOLID  : {} {}/{} ...'.format(di.isoformat(), i+1, ndays))
+            print(f'SOLID  : {di.isoformat()} {i+1}/{ndays} ...')
 
         # calc tide_u/n/u for the whole day
         (dt_outi,
@@ -169,34 +167,14 @@ def calc_solid_earth_tides_point_per_day(lat, lon, date_str, step_sec=60):
         msg += '\n    Check instruction at: https://github.com/insarlab/PySolid.'
         raise ImportError(msg)
 
-    ## calc solid Earth tides and write to text file
-    txt_file = os.path.abspath('solid.txt')
-    if os.path.isfile(txt_file):
-        os.remove(txt_file)
-
-    # Run twice to circumvent fortran bug which cuts off last file in loop - Simran, Jun 2020
+    # calc solid Earth tides
     t = dt.datetime.strptime(date_str, '%Y%m%d')
-    for _ in range(2):
-        solid_point(lat, lon, t.year, t.month, t.day, step_sec)
+    secs, tide_e, tide_n, tide_u  = solid_point(
+        lat, lon, t.year, t.month, t.day, step_sec
+    )
 
-    ## read data from text file
-    num_row = int(24 * 60 * 60 / step_sec)
-    fc = np.loadtxt(txt_file,
-                    dtype=float,
-                    delimiter=',',
-                    skiprows=0,
-                    max_rows=num_row)
-
-    tide_e = fc[:, 1].flatten()
-    tide_n = fc[:, 2].flatten()
-    tide_u = fc[:, 3].flatten()
-
-    secs   = fc[:, 0].flatten()
     dt_out = [t + dt.timedelta(seconds=sec) for sec in secs]
     dt_out = np.array(dt_out)
-
-    # remove the temporary text file
-    os.remove(txt_file)
 
     return dt_out, tide_e, tide_n, tide_u
 
@@ -205,6 +183,8 @@ def calc_solid_earth_tides_point_per_day(lat, lon, date_str, step_sec=60):
 def plot_solid_earth_tides_point(dt_out, tide_e, tide_n, tide_u, lalo=None,
                                  out_fig=None, save=False, display=True):
     """Plot the solid Earth tides at one point."""
+    from matplotlib import pyplot as plt, dates as mdates
+
     # plot
     fig, axs = plt.subplots(nrows=3, ncols=1, figsize=[6, 4], sharex=True)
     for ax, data, label in zip(axs.flatten(),
@@ -223,6 +203,7 @@ def plot_solid_earth_tides_point(dt_out, tide_e, tide_n, tide_u, lalo=None,
     if lalo:
         axs[0].set_title('solid Earth tides at (N{}, E{})'.format(lalo[0], lalo[1]), fontsize=12)
     fig.tight_layout()
+    fig.align_ylabels()
 
     # output
     if out_fig:
@@ -247,6 +228,9 @@ def plot_power_spectral_density4tides(tide_ts, sample_spacing, out_fig=None, fig
     """Plot the power spectral density (PSD) of tides time-series.
     Note: for accurate PSD analysis, a long time-series, e.g. one year, is recommended.
     """
+    from matplotlib import pyplot as plt, ticker
+    from scipy import signal
+
     ## calc PSD
     freq, psd = signal.periodogram(tide_ts, fs=1/sample_spacing, scaling='density')
     # get rid of zero in the first element

@@ -16,21 +16,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, macos-11]  #windows-2019
+        # skip building wheel for windows as it's not working yet
+        os: [ubuntu-latest, macos-13]  #windows-2019
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Provide gfortran (macOS)
+      - name: Provide gfortran (macOS-13)
         if: runner.os == 'macOS'
         run: |
           # https://github.com/actions/virtual-environments/issues/2524
           # https://github.com/cbg-ethz/dce/blob/master/.github/workflows/pkgdown.yaml
-          sudo ln -s /usr/local/bin/gfortran-11 /usr/local/bin/gfortran
+          sudo ln -s /usr/local/bin/gfortran-13 /usr/local/bin/gfortran
           sudo mkdir /usr/local/gfortran
-          sudo ln -s /usr/local/Cellar/gcc@11/*/lib/gcc/11 /usr/local/gfortran/lib
+          sudo ln -s /usr/local/Cellar/gcc@13/*/lib/gcc/13 /usr/local/gfortran/lib
           gfortran --version
 
       - name: Provide gfortran (Windows)
@@ -43,7 +44,7 @@ jobs:
           echo "[build]`ncompiler=mingw32" | Out-File -Encoding ASCII ~/pydistutils.cfg
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.11.4
+        uses: pypa/cibuildwheel@v2.14.1
         env:
           # Disable building for PyPy and 32bit.
           CIBW_SKIP: pp* *-win32 *-manylinux_i686
@@ -54,23 +55,25 @@ jobs:
           CIBW_BEFORE_BUILD_WINDOWS: pip install delvewheel
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel show {wheel} && delvewheel repair -w {dest_dir} {wheel} --no-mangle-all"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
+          name: artifact-wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build 🐍 source distribution 📦
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Build sdist
         run: pipx run build --sdist
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
+          name: artifact-source
           path: dist/*.tar.gz
 
   upload_pypi:
@@ -79,20 +82,23 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'insarlab' && github.event_name == 'push'
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           # unpacks default artifact into dist/
           # if `name: artifact` is omitted, the action will create extra parent dir
-          name: artifact
           path: dist
+          pattern: artifact-*
+          merge-multiple: true
+      - name: Display structure of downloaded files
+        run: ls -R dist
 
       - name: Publish developed version 📦 to Test PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
-          skip_existing: false
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: false
           verbose: true
 
       - name: Publish released version 📦 to PyPI

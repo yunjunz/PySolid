@@ -23,45 +23,42 @@ jobs:
     # The executor is the environment in which the steps below will be executed - below will use a python 3.9 container
     # Change the version below to your required version of python
     docker:
-      - image: ubuntu:bionic
+      - image: cimg/base:current
         environment:
-          CONDA_PREFIX: /root/tools/miniconda3
+          CONDA_PREFIX: /root/tools/miniforge
+          PYSOLID_HOME: /root/tools/PySolid
         user: root
     working_directory: /root/tools/PySolid
     # Checkout the code as the first step. This is a dedicated CircleCI step.
     steps:
       - checkout
       - run:
-          name: Setting Environment with Miniconda
+          name: Setting Environment with Miniforge
           command: |
             apt update
             apt-get update --yes && apt-get upgrade --yes
             apt-get install --yes wget git
-            # download and install miniconda3
+            # download and install miniforge
             mkdir -p ${HOME}/tools
             cd ${HOME}/tools
-            wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-            bash Miniconda3-latest-Linux-x86_64.sh -b -p ${HOME}/tools/miniconda3
-            ${HOME}/tools/miniconda3/bin/conda init bash
-            ${HOME}/tools/miniconda3/bin/conda config --add channels conda-forge
-            ${HOME}/tools/miniconda3/bin/conda install -c conda-forge --yes mamba
+            wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+            bash Miniforge3-Linux-x86_64.sh -b -p ${HOME}/tools/miniforge
+            ${HOME}/tools/miniforge/bin/mamba init bash
+            # modify/export env var PATH to BASH_ENV to be shared across run steps
+            echo 'export PATH=${CONDA_PREFIX}/bin:${PATH}' >> ${BASH_ENV}
+
       - run:
           name: Installing PySolid
           no_output_timeout: 10m
           command: |
             export PYTHONUNBUFFERED=1
-            # setup environment variable
-            export PATH=${CONDA_PREFIX}/bin:${PATH}
-            # install dependencies
-            source activate root
-            mamba install --verbose --yes  fortran-compiler --file ${HOME}/tools/PySolid/requirements.txt
-            python -m pip install ${HOME}/tools/PySolid
+            # install dependencies and source code
+            mamba install --verbose --yes  fortran-compiler --file ${PYSOLID_HOME}/requirements.txt --file ${PYSOLID_HOME}/tests/requirements.txt
+            python -m pip install ${PYSOLID_HOME}
 
       - run:
-          name: Test
+          name: Unit Test
           command: |
-            # setup environment variables
-            export PATH=${CONDA_PREFIX}/bin:${PATH}
             # run tests
-            python ${HOME}/tools/PySolid/tests/point.py
-            python ${HOME}/tools/PySolid/tests/grid.py
+            python ${PYSOLID_HOME}/tests/point.py
+            python ${PYSOLID_HOME}/tests/grid.py

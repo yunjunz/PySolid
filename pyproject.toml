@@ -1,19 +1,24 @@
 [build-system]
-requires = ["setuptools<60.0", "setuptools_scm[toml]>=6.2", "numpy<1.23.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["cmake", "scikit-build-core", "setuptools", "setuptools_scm[toml]>=6.2", "numpy", "wheel"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "pysolid"
 description = "A Python wrapper for solid to compute solid Earth tides"
 authors = [
-    {name="Zhang Yunjun", email="yunjunzgeo@gmail.com"},
+    {name="Zhang Yunjun", email="yunjunz@outlook.com"},
     {name="Dennis Milbert"},
 ]
 readme = "README.md"
 requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "scipy",
+]
+
 keywords = ["solid Earth tides", "deformation", "geodesy", "geophysics"]
 license = {text = "GPL-3.0-or-later"}
-classifiers=[
+classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
@@ -21,12 +26,10 @@ classifiers=[
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
 ]
-dependencies = [
-    "numpy",
-    "scipy",
-    "matplotlib",
-    "scikit-image",
-]
+
+# see section: setuptools_scm
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html#dynamic-metadata
+# dependencies will be read from text files
 dynamic = ["version"]
 
 [project.urls]
@@ -46,3 +49,6 @@ pysolid = ["*.for"]
 [tool.setuptools_scm]
 version_scheme = "post-release"
 local_scheme = "no-local-version"
+
+[tool.scikit-build]
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
